@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Etiquetas</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="icon" href="fotos/favicon.png" type="image/png">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            background-color: #f0f2f5;
+        }
+        .main-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        .sidebar-wrapper {
+            width: 400px;
+            height: 100%;
+            position: fixed;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 100%;
+            padding: 20px;
+            background: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            height: 100%;
+            box-sizing: border-box;
+        }
+        .opciones-scroll {
+            width: 100%;
+            overflow-y: auto;
+            padding-right: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
+        }
+        .sidebar h1 {
+            font-size: 24px;
+            text-align: center;
+            color: #333;
+            margin: 0 0 20px 0;
+        }
+        label, input, button, select {
+            display: block;
+            margin: 10px 0;
+            width: calc(100% - 40px); /* Ajustar el ancho de los elementos */
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .opcionItem {
+            display: flex;
+            flex-direction: column;
+            width: calc(100% - 40px); /* Ajustar el ancho de las opciones */
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+            align-items: center;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .opcionItem.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .search-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        .search-container input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .resultados {
+            width: 100%;
+            max-height: 150px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            display: none;
+            position: absolute;
+            z-index: 1;
+            top: 43%; /* Ajusta este valor para subir las opciones */
+        }
+
+        .resultado-item {
+            padding: 8px;
+            cursor: pointer;
+            font-size: 12px; /* Ajusta el tamaño de la fuente de las opciones */
+        }
+        .resultado-item:hover {
+            background-color: #f0f0f0;
+        }
+        .cantidad-container, .etiquetas-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 5px;
+            width: 100%;
+        }
+        .cantidad-container label, .etiquetas-container label {
+            text-align: left;
+            width: auto;
+        }
+        input.cantidad, input.numEtiquetas {
+            width: 60px;
+            height: 30px;
+            box-sizing: border-box;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: auto;
+            width: 100%;
+            padding: 20px 0; /* Añadir padding superior e inferior */
+            margin-bottom: -20px; /* Ajustar margen inferior */
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin: 10px 20px; /* Añadir margen por todos lados */
+            width: calc(100% - 40px); /* Hacer que los botones ocupen todo el ancho del contenedor */
+            box-sizing: border-box;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .eliminar {
+            background-color: #dc3545;
+            margin-top: 10px;
+        }
+        .eliminar:hover {
+            background-color: #c82333;
+        }
+        .preview-container {
+            flex-grow: 1;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            overflow-y: auto;
+            background: white;
+            margin-left: 400px;
+        }
+        .page-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .preview-page {
+            width: 210mm;
+            height: 297mm;
+            background: white; /* Fondo blanco */
+            border: 1mm solid black; /* Borde negro alrededor de la hoja */
+            position: relative;
+            overflow: hidden;
+        }
+        .etiqueta {
+            position: absolute;
+            width: 105mm;
+            height: 29mm;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            font-size: 12px;
+            text-align: center;
+            padding-top: 2mm;
+            box-sizing: border-box;
+            border: 0.25mm solid black; /* Añadir borde a las etiquetas */
+        }
+        .titulo {
+            text-align: left;
+            width: 100%;
+            padding-left: 5mm;
+        }
+        .contenedorLogo {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 15px; /* Ajusta la separación con el título */
+        }
+        .logo {
+            max-width: 180px; /* Ajusta el tamaño según sea necesario */
+            height: 45px;
+        }
+        .unidades {
+            font-size: 12px;
+            text-align: left;
+            width: 100%;
+            padding-left: 5mm;
+        }
+        .imagen {
+            width: calc(100% - 40mm); /* Ajustar el ancho de la imagen */
+            height: 10mm; /* Ajustar la altura de la imagen */
+            margin: 0 20mm 0.2mm 20mm; /* Eliminar el margen superior */
+        }
+        .page-number {
+            margin-top: 5px;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="sidebar-wrapper">
+            <div class="sidebar">
+                <div class="contenedorLogo">
+                    <img src="fotos/dessata_300ppp.png" alt="logo" class="logo">
+                </div>
+                <h1>Generador de Etiquetas</h1>
+                <div class="opciones-scroll" id="opcionesContainer">
+                    <!-- Inicialmente vacío -->
+                </div>
+                <div class="button-container">
+                    <button onclick="agregarOpcion()">Agregar opción</button>
+                    <button onclick="previsualizarPDF()">Previsualizar</button>
+                    <button onclick="generarPDF()">Descargar PDF</button>
+                </div>
+            </div>
+        </div>
+        <div id="preview" class="preview-container"></div>
+    </div>
+
+    <script>
+        let opcionCounter = 1;
+        const etiquetas = {
+            es: [
+                { value: "4703MAXI|Cepillo para el cabello Dessata Maxi Aloha-Cereza", display: "4703MAXI - Maxi Aloha-Cereza", cantidad: 10 },
+                { value: "5007MAXI|Cepillo para el cabello Dessata Maxi Azul-Turquesa", display: "5007MAXI - Maxi Azul-Turquesa", cantidad: 10 },
+                { value: "6769MAXI|Cepillo para el cabello Dessata Maxi Catalina Estrada", display: "6769MAXI - Maxi Catalina Estrada", cantidad: 10},
+                { value: "1410MAXI|Cepillo para el cabello Dessata Maxi Fucsia Metal-Negro", display: "1410MAXI - Maxi Fucsia Metal-Negro", cantidad: 10},
+                { value: "1410STAR|Cepillo para el cabello Dessata Maxi Fucsia Metal-Negro Prisma", display: "1410STAR - Maxi Fucsia Metal-Negro Prisma", cantidad: 8},
+                { value: "6468MAXI|Cepillo para el cabello Dessata Maxi Medusas-Fucsia", display: "6468MAXI - Maxi Medusas-Fucsia", cantidad: 10},
+                { value: "1010MAXI|Cepillo para el cabello Dessata Maxi Negro-Negro", display: "1010MAXI - Maxi Negro-Negro", cantidad: 10},
+                { value: "6567MAXI|Cepillo para el cabello Dessata Maxi New Catrina-Granate", display: "6567MAXI - Maxi New Catrina-Granate", cantidad: 10},
+                { value: "1610MAXI|Cepillo para el cabello Dessata Maxi Oro Rosa Metal-Negro", display: "1610MAXI - Maxi Oro Rosa Metal-Negro", cantidad: 10},
+                { value: "1610STAR|Cepillo para el cabello Dessata Maxi Oro Rosa Metal-Negro Prisma", display: "1610STAR - Maxi Oro Rosa Metal-Negro Prisma", cantidad: 8},
+                { value: "0413MAXI|Cepillo para el cabello Dessata Maxi Rosa-Plata", display: "0413MAXI - Maxi Oro Rosa Metal-Negro Prisma", cantidad: 10},
+                { value: "5107MAXI|Cepillo para el cabello Dessata Maxi Sakura-Turquesa", display: "5107MAXI - Maxi Sakura-Turquesa", cantidad: 10},
+                { value: "SW1410MAXI|Cepillo para el cabello Dessata Maxi Swarovski Official Fucsia", display: "SW1410MAXI - Maxi Swarovski Official Fucsia", cantidad: 8},
+                { value: "4010MAXI|Cepillo para el cabello Dessata Maxi Turquesa Metal-Negro", display: "4010MAXI - Maxi Turquesa Metal-Negro", cantidad: 10},
+                { value: "5470MAXI|Cepillo para el cabello Dessata Maxi Velvet-Rosa", display: "5470MAXI - Maxi Velvet-Rosa", cantidad: 10},
+                { value: "5344MAXI|Cepillo para el cabello Dessata Maxi Verde-Rosa", display: "5344MAXI - Maxi Verde-Rosa", cantidad: 10},
+                { value: "5245MAXI|Cepillo para el cabello Dessata Maxi Violeta-Lila", display: "5245MAXI - Maxi Violeta-Lila", cantidad: 10},
+                { value: "4703MINI|Cepillo para el cabello Dessata Mini Aloha-Cereza", display: "4703MINI - Mini Aloha-Cereza", cantidad: 10},
+                { value: "5007MINI|Cepillo para el cabello Dessata Mini Azul-Turquesa", display: "5007MINI - Mini Azul-Turquesa", cantidad: 10},
+                { value: "1911MINI|Cepillo para el cabello Dessata Mini Barber Negro-Oro", display: "1911MINI - Mini Barber Negro-Oro", cantidad: 10},
+                { value: "MP0006MINI|Cepillo para el cabello Dessata Mini Barber Negro-Plata", display: "MP0006MINI - Mini Barber Negro-Plata", cantidad: 10},
+                { value: "0942MINI|Cepillo para el cabello Dessata Mini Blanco-Coral", display: "0942MINI - Mini Blanco-Coral", cantidad: 10},
+                { value: "0902MINI|Cepillo para el cabello Dessata Mini Blanco-Mandarina", display: "0902MINI - Mini Blanco-Mandarina", cantidad: 10},
+                { value: "1706MINI|Cepillo para el cabello Dessata Mini Catrinas-Morado", display: "1706MINI - Mini Catrinas-Morado", cantidad: 10},
+                { value: "440310MINI|Cepillo para el cabello Dessata Mini Dolce Vita-Cereza-Negro", display: "440310MINI - Mini Dolce Vita-Cereza-Negro", cantidad: 10},
+                { value: "1410MINI|Cepillo para el cabello Dessata Mini Fucsia Metal-Negro", display: "1410MINI - Mini Fucsia Metal-Negro", cantidad: 10},
+                { value: "050108MINI|Cepillo para el cabello Dessata Mini Fucsia-Amarillo-Lima", display: "050108MINI - Mini Fucsia-Amarillo-Lima", cantidad: 10},
+                { value: "050608MINI|Cepillo para el cabello Dessata Mini Fucsia-Morado-Lima", display: "050608MINI - Mini Fucsia-Morado-Lima", cantidad: 10},
+                { value: "0510MINI|Cepillo para el cabello Dessata Mini Fucsia-Negro", display: "0510MINI - Mini Fucsia-Negro", cantidad: 10},
+                { value: "1810MINI|Cepillo para el cabello Dessata Mini Leopardo-Negro", display: "1810MINI - Mini Leopardo-Negro", cantidad: 10},
+                { value: "430605MINI|Cepillo para el cabello Dessata Mini Love-Morado-Fucsia", display: "430605MINI - Mini Love-Morado-Fucsia", cantidad: 10},
+                { value: "2013MINI|Cepillo para el cabello Dessata Mini Mariposas-Plata", display: "2013MINI - Mini Mariposas-Plata", cantidad: 10},
+                { value: "1905MINI|Cepillo para el cabello Dessata Mini Meow-Amarillo-Fucsia", display: "1905MINI - Mini Meow-Amarillo-Fucsia", cantidad: 10},
+                { value: "6101MINI|Cepillo para el cabello Dessata Mini Music-Amarillo Fluor", display: "6101MINI - Mini Music-Amarillo Fluor", cantidad: 10},
+                { value: "100810MINI|Cepillo para el cabello Dessata Mini Negro-Lima-Negro", display: "100810MINI - Mini Negro-Lima-Negro", cantidad: 10},
+                { value: "1010MINI|Cepillo para el cabello Dessata Mini Negro-Negro", display: "1010MINI - Mini Negro-Negro", cantidad: 10},
+                { value: "101210MINI|Cepillo para el cabello Dessata Mini Negro-Oro viejo-Negro", display: "101210MINI - Mini Negro-Oro viejo-Negro", cantidad: 10},
+                { value: "100710MINI|Cepillo para el cabello Dessata Mini Negro-Turquesa-Negro", display: "100710MINI - Mini Negro-Turquesa-Negro", cantidad: 10},
+                { value: "1210MINI|Cepillo para el cabello Dessata Mini Oro Antiguo-Negro", display: "1210MINI - Mini Oro Antiguo-Negro", cantidad: 10},
+                { value: "1610MINI|Cepillo para el cabello Dessata Mini Oro Rosa Metal-Negro", display: "1610MINI - Mini Oro Rosa Metal-Negro", cantidad: 10},
+                { value: "1205MINI|Cepillo para el cabello Dessata Mini Oro Viejo-Fucsia-Fucsia", display: "1205MINI - Mini Oro Viejo-Fucsia-Fucsia", cantidad: 10},
+                { value: "120512MINI|Cepillo para el cabello Dessata Mini Oro Viejo-Fucsia-Oro Viejo", display: "120512MINI - Mini Oro Viejo-Fucsia-Oro Viejo", cantidad: 10},
+                { value: "121012MINI|Cepillo para el cabello Dessata Mini Oro Viejo-Negro-Oro Viejo", display: "121012MINI - Mini Oro Viejo-Negro-Oro Viejo", cantidad: 10},
+                { value: "1110MINI|Cepillo para el cabello Dessata Mini Oro-Negro", display: "1110MINI - Mini Oro-Negro", cantidad: 10},
+                { value: "1111MINI|Cepillo para el cabello Dessata Mini Oro-Oro", display: "1111MINI - Mini Oro-Oro", cantidad: 10},
+                { value: "041305MINI|Cepillo para el cabello Dessata Mini Rosa-Plata-Fucsia", display: "041305MINI - Mini Rosa-Plata-Fucsia", cantidad: 10},
+                { value: "510507MINI|Cepillo para el cabello Dessata Mini Sakura-Fucsia-Turquesa", display: "510507MINI - Mini Sakura-Fucsia-Turquesa", cantidad: 10},
+                { value: "4010MINI|Cepillo para el cabello Dessata Mini Turquesa Metal-Negro", display: "4010MINI - Mini Turquesa Metal-Negro", cantidad: 10},
+                { value: "0742MINI|Cepillo para el cabello Dessata Mini Turquesa-Coral", display: "0742MINI - Mini Turquesa-Coral", cantidad: 10},
+                { value: "070506MINI|Cepillo para el cabello Dessata Mini Turquesa-Fucsia-Morado", display: "070506MINI - Mini Turquesa-Fucsia-Morado", cantidad: 10},
+                { value: "1804MINI|Cepillo para el cabello Dessata Mini Unicorn-Rosa purpurina", display: "1804MINI - Mini Unicorn-Rosa purpurina", cantidad: 10},
+                { value: "0803MINI|Cepillo para el cabello Dessata Mini Verde-Cereza", display: "0803MINI - Mini Verde-Cereza", cantidad: 10},
+                { value: "5007ORIG|Cepillo para el cabello Dessata Original Azul-Turquesa", display: "5007ORIG - Original Azul-Turquesa", cantidad: 10},
+                { value: "0501ORIG|Cepillo para el cabello Dessata Original Fucsia-Amarillo", display: "0501ORIG - Original Fucsia-Amarillo", cantidad: 10},
+                { value: "5245ORIG|Cepillo para el cabello Dessata Original Lila-Violeta", display: "5245ORIG - Original Lila-Violeta", cantidad: 10},
+                { value: "6468ORIG|Cepillo para el cabello Dessata Original Medusas-Fucsia", display: "6468ORIG - Original Medusas-Fucsia", cantidad: 10},
+                { value: "6101ORIG|Cepillo para el cabello Dessata Original Music-Amarillo", display: "6101ORIG - Original Music-Amarillo", cantidad: 10},
+                { value: "1010ORIG|Cepillo para el cabello Dessata Original Negro-Negro", display: "1010ORIG - Original Negro-Negro", cantidad: 10},
+                { value: "6567ORIG|Cepillo para el cabello Dessata Original New Catrina-Granate", display: "6567ORIG - Original New Catrina-Granate", cantidad: 10},
+                { value: "2927ORIG|Cepillo para el cabello Dessata Original Turquesa Pastel - Rosa", display: "2927ORIG - Original Turquesa Pastel - Rosa", cantidad: 10},
+                { value: "5344ORIG|Cepillo para el cabello Dessata Original Verde-Rosa", display: "5344ORIG - Original Verde-Rosa", cantidad: 10},
+                { value: "DET0307MINI|Cepillo para el cabello Detangler Mini Baby Bunny", display: "DET0307MINI - Mini Baby Bunny", cantidad: 14},
+                { value: "DET0206MINI|Cepillo para el cabello Detangler Mini Baby Foxy", display: "DET0206MINI - Mini Baby Foxy", cantidad: 14},
+                { value: "DET0105MINI|Cepillo para el cabello Detangler Mini Baby Ponny", display: "DET0105MINI - Mini Baby Ponny", cantidad: 14},
+                { value: "DET3030MINI|Cepillo para el cabello Detangler Mini Fresa", display: "DET3030MINI - Mini Fresa", cantidad: 14},
+                { value: "DET3232MINI|Cepillo para el cabello Detangler Mini Lavanda", display: "DET3232MINI - Mini Lavanda", cantidad: 14},
+                { value: "DET5104MINI|Cepillo para el cabello Detangler Mini Lila-Plata-Rosa", display: "DET5104MINI - Mini Lila-Plata-Rosa", cantidad: 14},
+                { value: "DET3131MINI|Cepillo para el cabello Detangler Mini Vainilla", display: "DET3131MINI - Mini Vainilla", cantidad: 14},
+                { value: "DET7805ORIG|Cepillo para el cabello Detangler Original Bicycle", display: "DET7805ORIG - Original Bicycle", cantidad: 12},
+                { value: "DET7502ORIG|Cepillo para el cabello Detangler Original Butterfly", display: "DET7502ORIG - Original Butterfly", cantidad: 12},
+                { value: "DET6806ORIG|Cepillo para el cabello Detangler Original Fem Silhouette", display: "DET6806ORIG - Original Fem Silhouette", cantidad: 12},
+                { value: "DET4810ORIG|Cepillo para el cabello Detangler Original Fucsia Satinado-Negro", display: "DET4810ORIG - Original Fucsia Satinado-Negro", cantidad: 12},
+                { value: "DET0562ORIG|Cepillo para el cabello Detangler Original Fucsia-Azul", display: "DET0562ORIG - Original Fucsia-Azul", cantidad: 12},
+                { value: "DET0605ORIG|Cepillo para el cabello Detangler Original Morado-Fucsia", display: "DET0605ORIG - Original Morado-Fucsia", cantidad: 12},
+                { value: "DET0608ORIG|Cepillo para el cabello Detangler Original Morado-Lima", display: "DET0608ORIG - Original Morado-Lima", cantidad: 12},
+                { value: "DET7910ORIG|Cepillo para el cabello Detangler Original Rock N Roll", display: "DET7910ORIG - Original Rock N Roll", cantidad: 12},
+                { value: "DET0405ORIG|Cepillo para el cabello Detangler Original Rosa-Fucsia", display: "DET0405ORIG - Original Rosa-Fucsia", cantidad: 12},
+                { value: "DET0424ORIG|Cepillo para el cabello Detangler Original Rosa-Granate", display: "DET0424ORIG - Original Rosa-Granate", cantidad: 12},
+                { value: "DET0406ORIG|Cepillo para el cabello Detangler Original Rosa-Morado", display: "DET0406ORIG - Original Rosa-Morado", cantidad: 12},
+                { value: "DET7207ORIG|Cepillo para el cabello Detangler Original Sirenita", display: "DET7207ORIG - Original Sirenita", cantidad: 12},
+                { value: "DET7690ORIG|Cepillo para el cabello Detangler Original Snowboard", display: "DET7690ORIG - Original Snowboard", cantidad: 12},
+                { value: "DET7703ORIG|Cepillo para el cabello Detangler Original Teen Bubble Gum", display: "DET7703ORIG - Original Teen Bubble Gum", cantidad: 12},
+                { value: "DET8068ORIG|Cepillo para el cabello Detangler Original Teen Bunny", display: "DET8068ORIG - Original Teen Bunny", cantidad: 12},
+                { value: "DET8104ORIG|Cepillo para el cabello Detangler Original Teen Curly", display: "DET8104ORIG - Original Teen Curly", cantidad: 12},
+                { value: "DET7009ORIG|Cepillo para el cabello Detangler Original The Future is Female", display: "DET7009ORIG - Original The Future is Female", cantidad: 12},
+                { value: "DET4910ORIG|Cepillo para el cabello Detangler Original Turquesa Satinado-Negro", display: "DET4910ORIG - Original Turquesa Satinado-Negro", cantidad: 12},
+                { value: "DET7105ORIG|Cepillo para el cabello Detangler Original Unicorn", display: "DET7105ORIG - Original Unicorn", cantidad: 12},
+                { value: "BIO0001|Cepillo para el cabello compostable Dessata BIOCOMP Menta", display: "BIO0001 - BIOCOMP Menta", cantidad: 10},
+                { value: "0001HAND|Cepillo para el cabello con mango Dessata Handy Cheetah", display: "0001HAND - Handy Cheetah", cantidad: 6},
+                { value: "0006HAND|Cepillo para el cabello con mango Dessata Handy Menta", display: "0006HAND - Handy Menta", cantidad: 6},
+                { value: "0005HAND|Cepillo para el cabello con mango Dessata Handy Negro", display: "0005HAND - Handy Negro", cantidad: 6},
+                { value: "0002HAND|Cepillo para el cabello con mango Dessata Handy Seahorse", display: "0002HAND - Handy Seahorse", cantidad: 6},
+                { value: "0003HAND|Cepillo para el cabello con mango Dessata Handy Velvet", display: "0003HAND - Handy Velvet", cantidad: 6},
+                { value: "0004HAND|Cepillo para el cabello con mango Dessata Handy Violeta", display: "0004HAND - Handy Violeta", cantidad: 6},
+                { value: "0024SURT|Expositor 10 cepillos para el cabello Dessata Catalina Estrada", display: "0024SURT - Expositor 10 cepillos Catalina Estrada", cantidad: 1},
+                { value: "0023SURT|Expositor 20 cepillos para el cabello Dessata Biocomp", display: "0023SURT - Expositor 20 cepillos Biocomp", cantidad: 1},
+                { value: "0009SURT|Expositor BRIGHT cepillos + tratamientos capilares", display: "0009SURT - Expositor BRIGHT", cantidad: 1},
+                { value: "0005SURT|Surtido TOP10 de cepillos para el cabello Dessata Maxi Colours", display: "0005SURT - Surtido Maxi Colours", cantidad: 1},
+                { value: "0006SURT|Surtido TOP10 de cepillos para el cabello Dessata Mini Colours", display: "0006SURT - Surtido Mini Colours", cantidad: 1},
+                { value: "0018SURT|Expositor 30 cepillos desenredantes para el cabello Dessata", display: "0018SURT - Expositor 30 cepillos", cantidad: 1},
+                { value: "0003SURT|Surtido variado 10 cepillos para el cabello Dessata Prints Maxi", display: "0003SURT - Surtido 10 Prints Maxi", cantidad: 60},
+                { value: "0025SURT|Surtido variado 10 cepillos para el cabello Dessata Prints Mini", display: "0025SURT - Surtido 10 Prints Mini", cantidad: 60},
+                { value: "0026SURT|Expositor 8 cepillos desenredantes para el cabello Dessata", display: "0026SURT - Expositor 8 cepillos", cantidad: 1},
+                { value: "0027SURT|Expositor 20 cepillos desenredantes para el cabello Dessata", display: "0027SURT - Expositor 20 cepillos", cantidad: 1},
+                { value: "0002HBOW|Coletero de tela Dessata Rayas Azul", display: "0002HBOW - Coletero Rayas Azul", cantidad: 60},
+                { value: "0001HBOW|Coletero de tela Dessata Rayas Rosa", display: "0001HBOW - Coletero Rayas Rosa", cantidad: 60},
+                { value: "0005HBOW|Coletero de tela tie-dye Dessata Azul", display: "0005HBOW - Coletero tie-dye Azul", cantidad: 78},
+                { value: "0006HBOW|Coletero de tela tie-dye Dessata Morado", display: "0006HBOW - Coletero tie-dye Morado", cantidad: 78},
+                { value: "0003RING|Coletero sin tirones Fucsia 6 unidades", display: "0003RING - Coletero sin tirones 6 uds.", cantidad: 36},
+                { value: "0004RING|Coletero sin tirones Fucsia Metal 6 unidades", display: "0004RING - Coletero Fucsia Metal 6 uds.", cantidad: 36},
+                { value: "0018RING|Coletero sin tirones Lila Metal 6 unidades", display: "0018RING - Coletero Lila Metal 6 uds.", cantidad: 36},
+                { value: "0005RING|Coletero sin tirones Oro Metal 6 unidades", display: "0005RING - Coletero Oro Metal 6 uds.", cantidad: 36},
+                { value: "0001RING|Coletero sin tirones Rainbow 6 unidades", display: "0001RING - Coletero Rainbow 6 uds.", cantidad: 36},
+                { value: "0007RING|Coletero sin tirones Turquesa Metal 6 unidades", display: "0007RING - Coletero Turquesa Metal 6 uds.", cantidad: 36},
+                { value: "0011RING|Coletero sin tirones Unicorn. 6 unidades/estuche.", display: "0011RING - Coletero Unicorn 6 uds./estuche", cantidad: 36},
+                { value: "0012RING|Coleteros sin tirones Negro. 6 unidades/estuche.", display: "0012RING - Negro. 6 unidades/estuche.", cantidad: 36},
+                { value: "0004HPIN|Horquillas para el pelo Dessata Negro", display: "0004HPIN - Horquillas Negro", cantidad: 36},
+                { value: "0001HPIN|Horquillas para el pelo Dessata Rosa", display: "0001HPIN - Horquillas Rosa", cantidad: 36},
+                { value: "0003HPIN|Horquillas para el pelo Dessata Verde", display: "0003HPIN - Horquillas Verde", cantidad: 36},
+                { value: "0002HPIN|Horquillas para el pelo Dessata Violeta", display: "0002HPIN - Horquillas Violeta", cantidad: 36},
+                { value: "0001CLIP|Pinza para el pelo Dessata Media luna Azul", display: "0001CLIP - Pinza Media luna Azul", cantidad: 24},
+                { value: "0003CLIP|Pinza para el pelo Dessata Media luna Blanco", display: "0003CLIP - Pinza Media luna Blanco", cantidad: 24},
+                { value: "0002CLIP|Pinza para el pelo Dessata Media luna Turquesa", display: "0002CLIP - Pinza Media luna Turquesa", cantidad: 24},
+                { value: "0006CLIP|Pinza para el pelo Dessata Media luna Marrón", display: "0006CLIP - Pinza Media luna Marrón", cantidad: 24},
+                { value: "0005CLIP|Pinza para el pelo Dessata Media luna Morado", display: "0005CLIP - Pinza Media luna Morado", cantidad: 24},
+                { value: "0004CLIP|Pinza para el pelo Dessata Media luna Rosa", display: "0004CLIP - Pinza Media luna Rosa", cantidad: 24},
+                { value: "EX DET|Expositor Detangler", display: "EX DET - Expositor Detangler", cantidad: 1},
+                { value: "EX CATA|Expositor de sobremesa Catalina Estrada", display: "EX CATA - Expositor Catalina Estrada", cantidad: 1},
+                { value: "EX BIOCOMP|Expositor de sobremesa Dessata BIOCOMP", display: "EX BIOCOMP - Expositor BIOCOMP", cantidad: 1},
+                { value: "EX SPP COL|Expositor de sobremesa ESPECIAL COLOURS", display: "EX SPP COL - Expositor ESPECIAL COLOURS", cantidad: 1},
+                { value: "EX SPP PRO|Expositor de sobremesa ESPECIAL PROFESSIONAL", display: "EX SPP PRO - Expositor ESPECIAL PROFESSIONAL", cantidad: 1},
+                { value: "EX PPB|Expositor de sobremesa PREMIUM BRIGHT", display: "EX PPB - Expositor PREMIUM BRIGHT", cantidad: 1},
+                { value: "EX PPP|Expositor de sobremesa PREMIUM COLOURS", display: "EX PPP - Expositor PREMIUM COLOURS", cantidad: 1},
+                { value: "EX SPN|Expositor de suelo con estantes", display: "EX SPN - Expositor de suelo con estantes", cantidad: 1},
+                { value: "EX BP|Bolsa Papel Dessata", display: "EX BP - Bolsa Papel Dessata", cantidad: 1},
+                { value: "EX BD|Bolsa cartón Dessata", display: "EX BD - Bolsa cartón Dessata", cantidad: 1},
+                { value: "EX NEC|Neceser Dessata Fucsia", display: "EX NEC - Neceser Dessata Fucsia", cantidad: 1},
+                { value: "EX DIP BIOCOMP|Díptico Dessata BIOCOMP", display: "EX DIP BIOCOMP - Díptico Dessata BIOCOMP", cantidad: 1},
+                { value: "EX LAMINA|Lámina explicativa de Campaña", display: "EX LAMINA - Lámina explicativa de Campaña", cantidad: 1},
+                { value: "EX DISP BIOCOMP|Peana Dessata BIOCOMP", display: "EX DISP BIOCOMP - Peana Dessata BIOCOMP", cantidad: 1},
+                { value: "EX POSTER BIOCOMP|Póster Dessata BIOCOMP", display: "EX POSTER BIOCOMP - Póster Dessata BIOCOMP", cantidad: 1},
+                { value: "EX POSTER|Póster edición especial Campaña", display: "EX POSTER - Póster edición especial Campaña", cantidad: 1},
+                { value: "EX REV|Revista DINA5 Dessata", display: "EX REV - Revista DINA5 Dessata", cantidad: 1},
+                { value: "0022SURT|Pack Tratamientos Capilares", display: "0022SURT - Pack Tratamientos Capilares", cantidad: 1},
+                { value: "0016SURT|Expositor de coleteros sin tirones. 36 estuches de 6 unidades", display: "0016SURT - Expositor coleteros 36 estuches 6uds.", cantidad: 1},
+                { value: "0017SURT|Pack de implantación de marca Dessata", display: "0017SURT - Pack implantación Dessata", cantidad: 1}
+            ],
+            en: [
+                { value: "4703MAXI|Dessata Maxi Aloha-Cherry Hairbrush", display: "4703MAXI - Maxi Aloha-Cherry", cantidad: 10 },
+                { value: "5007MAXI|Dessata Maxi Blue-Turquoise Hairbrush", display: "5007MAXI - Maxi Blue-Turquoise", cantidad: 10 },
+                { value: "6769MAXI|Dessata Maxi Catalina Estrada Hairbrush", display: "6769MAXI - Maxi Catalina Estrada", cantidad: 10},
+                { value: "1410MAXI|Dessata Maxi Fuchsia Metal-Black Hairbrush", display: "1410MAXI - Fuchsia Metal-Black", cantidad: 10},
+                { value: "1410STAR|Dessata Maxi Fuchsia Metal-Black Prisma Hairbrush", display: "1410STAR - Maxi Fuchsia Metal-Black Prisma", cantidad: 8},
+                { value: "6468MAXI|Dessata Maxi Jellyfish-Fuchsia Hairbrush", display: "6468MAXI - Maxi Jellyfish-Fuchsia", cantidad: 10},
+                { value: "1010MAXI|Dessata Maxi Black-Black Hairbrush", display: "1010MAXI - Maxi Black-Black", cantidad: 10},
+                { value: "6567MAXI|Dessata Maxi New Catrina-Garnet Hairbrush", display: "6567MAXI - Maxi Catrina-Garnet", cantidad: 10},
+                { value: "1610MAXI|Dessata Maxi Rose Gold Metal-Black Hairbrush", display: "1610MAXI - Maxi Rose Gold Metal-Black", cantidad: 10},
+                { value: "1610STAR|Dessata Maxi Rose Gold Metal-Black Prisma Hairbrush", display: "1610STAR - Maxi Rose Gold Metal-Black Prisma", cantidad: 8},
+                { value: "0413MAXI|Dessata Maxi Pink-Silver Hairbrush", display: "0413MAXI - Maxi Pink-Silver", cantidad: 10},
+                { value: "5107MAXI|Dessata Maxi Sakura-Turquoise Hairbrush", display: "5107MAXI - Maxi Sakura-Turquoise", cantidad: 10},
+                { value: "SW1410MAXI|Dessata Maxi Swarovski Official Fuchsia Hairbrush", display: "SW1410MAXI - Maxi Swarovski Official Fuchsia", cantidad: 8},
+                { value: "4010MAXI|Dessata Maxi Turquoise Metal-Black Hairbrush", display: "4010MAXI - Maxi Turquoise Metal-Black", cantidad: 10},
+                { value: "5470MAXI|Dessata Maxi Velvet-Pink Hairbrush", display: "5470MAXI - Velvet-Pink", cantidad: 10},
+                { value: "5344MAXI|Dessata Maxi Green-Pink Hairbrush", display: "5344MAXI - Maxi Green-Pink", cantidad: 10},
+                { value: "5245MAXI|Dessata Maxi Violet-Lilac Hairbrush", display: "5245MAXI - Maxi Violet-Lilac", cantidad: 10},
+                { value: "4703MINI|Dessata Mini Aloha-Cherry Hairbrush", display: "4703MINI - Mini Aloha-Cherry", cantidad: 10},
+                { value: "5007MINI|Dessata Mini Blue-Turquoise Hairbrush", display: "5007MINI - Mini Blue-Turquoise", cantidad: 10},
+                { value: "1911MINI|Dessata Mini Barber Black-Gold Hairbrush", display: "1911MINI - Mini Barber Black-Gold", cantidad: 10},
+                { value: "MP0006MINI|Dessata Mini Barber Black-Silver Hairbrush", display: "MP0006MINI - Mini Barber Black-Silver", cantidad: 10},
+                { value: "0942MINI|Dessata Mini White-Coral Hairbrush", display: "0942MINI - Mini White-Coral", cantidad: 10},
+                { value: "0902MINI|Dessata Mini White-Mandarin Hairbrush", display: "0902MINI - Mini White-Mandarin", cantidad: 10},
+                { value: "1706MINI|Dessata Mini Catrinas-Purple Hairbrush", display: "1706MINI - Mini Catrinas-Purple", cantidad: 10},
+                { value: "440310MINI|Dessata Mini Dolce Vita-Cherry-Black Hairbrush", display: "440310MINI - Mini Dolce Vita-Cherry-Black", cantidad: 10},
+                { value: "1410MINI|Dessata Mini Fuchsia Metal-Black Hairbrush", display: "1410MINI - Mini Fuchsia Metal-Black", cantidad: 10},
+                { value: "050108MINI|Dessata Mini Fuchsia-Yellow-Lime Hairbrush", display: "050108MINI - Mini Fuchsia-Yellow-Lime", cantidad: 10},
+                { value: "050608MINI|Dessata Mini Fuchsia-Purple-Lime Hairbrush", display: "050608MINI - Mini Fuchsia-Purple-Lime", cantidad: 10},
+                { value: "0510MINI|Dessata Mini Fuchsia-Black Hairbrush", display: "0510MINI - Mini Fuchsia-Black", cantidad: 10},
+                { value: "1810MINI|Dessata Mini Leopard-Black Hairbrush", display: "1810MINI - Mini Leopard-Black", cantidad: 10},
+                { value: "430605MINI|Dessata Mini Love-Purple-Fuchsia Hairbrush", display: "430605MINI - Mini Love-Purple-Fuchsia", cantidad: 10},
+                { value: "2013MINI|Dessata Mini Butterflies-Silver Hairbrush", display: "2013MINI - Mini Butterflies-Silver", cantidad: 10},
+                { value: "1905MINI|Dessata Mini Meow-Yellow-Fuchsia Hairbrush", display: "1905MINI - Mini Meow-Yellow-Fuchsia", cantidad: 10},
+                { value: "6101MINI|Dessata Mini Music-Neon Yellow Hairbrush", display: "6101MINI - Mini Music-Neon Yellow", cantidad: 10},
+                { value: "100810MINI|Dessata Mini Black-Lime-Black Hairbrush", display: "100810MINI - Mini Black-Lime-Black", cantidad: 10},
+                { value: "1010MINI|Dessata Mini Black-Black Hairbrush", display: "1010MINI - Mini Black-Black", cantidad: 10},
+                { value: "101210MINI|Dessata Mini Black-Old Gold-Black Hairbrush", display: "101210MINI - Mini Black-Old Gold-Black", cantidad: 10},
+                { value: "100710MINI|Dessata Mini Black-Turquoise-Black Hairbrush", display: "100710MINI - Mini Black-Turquoise-Black", cantidad: 10},
+                { value: "1210MINI|Dessata Mini Old Gold-Black Hairbrush", display: "1210MINI - Mini Old Gold-Black", cantidad: 10},
+                { value: "1610MINI|Dessata Mini Rose Gold Metal-Black Hairbrush", display: "1610MINI - Mini Rose Gold Metal-Black", cantidad: 10},
+                { value: "1205MINI|Dessata Mini Old Gold-Fuchsia-Fuchsia Hairbrush", display: "1205MINI - Mini Old Gold-Fuchsia-Fuchsia", cantidad: 10},
+                { value: "120512MINI|Dessata Mini Old Gold-Fuchsia-Old Gold Hairbrush", display: "120512MINI - Mini Old Gold-Fuchsia-Old Gold", cantidad: 10},
+                { value: "121012MINI|Dessata Mini Old Gold-Black-Old Gold Hairbrush", display: "121012MINI - Mini Old Gold-Black-Old Gold", cantidad: 10},
+                { value: "1110MINI|Dessata Mini Gold-Black Hairbrush", display: "1110MINI - Mini Gold-Black", cantidad: 10},
+                { value: "1111MINI|Dessata Mini Gold-Gold Hairbrush", display: "1111MINI - Mini Gold-Gold", cantidad: 10},
+                { value: "041305MINI|Dessata Mini Pink-Silver-Fuchsia Hairbrusha", display: "041305MINI - Mini Pink-Silver-Fuchsia", cantidad: 10},
+                { value: "510507MINI|Dessata Mini Sakura-Fuchsia-Turquoise Hairbrush", display: "510507MINI - Mini Sakura-Fuchsia-Turquoise", cantidad: 10},
+                { value: "355937MINI|Dessata Mini Summer Fuchsia-Turquoise Hairbrush", display: "355937MINI - Mini Summer Fuchsia-Turquoise", cantidad: 10},
+                { value: "4010MINI|Dessata Mini Turquoise Metal-Black Hairbrush", display: "4010MINI - Mini Turquoise Metal-Black", cantidad: 10},
+                { value: "0742MINI|Dessata Mini Turquoise-Coral Hairbrush", display: "0742MINI - Dessata Mini Turquoise-Coral", cantidad: 10},
+                { value: "070506MINI|Dessata Mini Turquoise-Fuchsia-Purple Hairbrush", display: "070506MINI - Mini Turquoise-Fuchsia-Purple", cantidad: 10},
+                { value: "1804MINI|Dessata Mini Unicorn-Pink Glitter Hairbrush", display: "1804MINI - Mini Unicorn-Pink Glitter", cantidad: 10},
+                { value: "0803MINI|Dessata Mini Green-Cherry Hairbrush", display: "0803MINI - Mini Green-Cherry", cantidad: 10},
+                { value: "5007ORIG|Dessata Original Blue-Turquoise Hairbrush", display: "5007ORIG - Original Blue-Turquoise", cantidad: 10},
+                { value: "0501ORIG|Dessata Original Fuchsia-Yellow Hairbrush", display: "0501ORIG - Original Fuchsia-Yellow", cantidad: 10},
+                { value: "5245ORIG|Dessata Original Lilac-Violet Hairbrush", display: "5245ORIG - Original Lilac-Violet", cantidad: 10},
+                { value: "6468ORIG|Dessata Original Jellyfish-Fuchsia Hairbrush", display: "6468ORIG - Original Jellyfish-Fuchsia", cantidad: 10},
+                { value: "6101ORIG|Dessata Original Music-Yellow Hairbrush", display: "6101ORIG - Original Music-Yellow", cantidad: 10},
+                { value: "1010ORIG|Dessata Original Black-Black Hairbrush", display: "1010ORIG - Original Black-Black", cantidad: 10},
+                { value: "6567ORIG|Dessata Original New Catrina-Garnet Hairbrush", display: "6567ORIG - Original New Catrina-Garnet", cantidad: 10},
+                { value: "2927ORIG|Dessata Original Pastel Turquoise-Pink Hairbrush", display: "2927ORIG - Original Pastel Turquoise-Pink", cantidad: 10},
+                { value: "5344ORIG|Dessata Original Green-Pink Hairbrush", display: "5344ORIG - Original Green-Pink", cantidad: 10},
+                { value: "DET0307MINI|Detangler Mini Baby Bunny Hairbrush", display: "DET0307MINI - Mini Baby Bunny", cantidad: 14},
+                { value: "DET0206MINI|Detangler Mini Baby Foxy Hairbrush", display: "DET0206MINI - Mini Baby Foxy", cantidad: 14},
+                { value: "DET0105MINI|Detangler Mini Baby Pony Hairbrush", display: "DET0105MINI - Mini Baby Pony", cantidad: 14},
+                { value: "DET3030MINI|Detangler Mini Strawberry Hairbrush", display: "DET3030MINI - Mini Strawberry", cantidad: 14},
+                { value: "DET3232MINI|Detangler Mini Lavender Hairbrush", display: "DET3232MINI - Mini Lavender", cantidad: 14},
+                { value: "DET5104MINI|Detangler Mini Lilac-Silver-Pink Hairbrush", display: "DET5104MINI - Mini Lilac-Silver-Pink", cantidad: 14},
+                { value: "DET3131MINI|Detangler Mini Vanilla Hairbrush", display: "DET3131MINI - Mini Vanilla", cantidad: 14},
+                { value: "DET7805ORIG|Detangler Original Bicycle Hairbrush", display: "DET7805ORIG - Original Bicycle", cantidad: 12},
+                { value: "DET7502ORIG|Detangler Original Butterfly Hairbrush", display: "DET7502ORIG - Original Butterfly", cantidad: 12},
+                { value: "DET6806ORIG|Detangler Original Fem Silhouette Hairbrush", display: "DET6806ORIG - Original Fem Silhouette", cantidad: 12},
+                { value: "DET4810ORIG|Detangler Original Fuchsia Satin-Black Hairbrush", display: "DET4810ORIG - Original Fuchsia Satin-Black", cantidad: 12},
+                { value: "DET0562ORIG|Detangler Original Fuchsia-Blue Hairbrush", display: "DET0562ORIG - Original Fuchsia-Blue", cantidad: 12},
+                { value: "DET0605ORIG|Detangler Original Purple-Fuchsia Hairbrush", display: "DET0605ORIG - Original Purple-Fuchsia", cantidad: 12},
+                { value: "DET0608ORIG|Detangler Original Purple-Lime Hairbrush", display: "DET0608ORIG - Original Purple-Lime", cantidad: 12},
+                { value: "DET7910ORIG|Detangler Original Rock N Roll Hairbrush", display: "DET7910ORIG - Original Rock N Roll", cantidad: 12},
+                { value: "DET0405ORIG|Detangler Original Pink-Fuchsia Hairbrush", display: "DET0405ORIG - Original Pink-Fuchsia", cantidad: 12},
+                { value: "DET0424ORIG|Detangler Original Pink-Garnet Hairbrush", display: "DET0424ORIG - Original Pink-Garnet", cantidad: 12},
+                { value: "DET0406ORIG|Detangler Original Pink-Purple Hairbrush", display: "DET0406ORIG - Original Pink-Purple", cantidad: 12},
+                { value: "DET7207ORIG|Detangler Original Mermaid Hairbrush", display: "DET7207ORIG - Original Mermaid", cantidad: 12},
+                { value: "DET7690ORIG|Detangler Original Snowboard Hairbrush", display: "DET7690ORIG - Original Snowboard", cantidad: 12},
+                { value: "DET7703ORIG|Detangler Original Teen Bubble Gum Hairbrush", display: "DET7703ORIG - Original Teen Bubble Gum", cantidad: 12},
+                { value: "DET8068ORIG|Detangler Original Teen Bunny Hairbrush", display: "DET8068ORIG - Original Teen Bunny", cantidad: 12},
+                { value: "DET8104ORIG|Detangler Original Teen Curly Hairbrush", display: "DET8104ORIG - Original Teen Curly", cantidad: 12},
+                { value: "DET7009ORIG|Detangler Original The Future is Female Hairbrush", display: "DET7009ORIG - Original The Future is Female", cantidad: 12},
+                { value: "DET4910ORIG|Detangler Original Turquoise Satin-Black Hairbrush", display: "DET4910ORIG - Original Turquoise Satin-Black", cantidad: 12},
+                { value: "DET7105ORIG|Detangler Original Unicorn Hairbrush", display: "DET7105ORIG - Original Unicorn", cantidad: 12},
+                { value: "BIO0001|Dessata BIOCOMP Mint Compostable Hairbrush", display: "BIO0001 - BIOCOMP Mint", cantidad: 10},
+                { value: "0001HAND|Dessata Handy Cheetah Hairbrush", display: "0001HAND - Handy Cheetah", cantidad: 6},
+                { value: "0006HAND|Dessata Handy Mint Hairbrush", display: "0006HAND - Handy Mint", cantidad: 6},
+                { value: "0005HAND|Dessata Handy Black Hairbrush", display: "0005HAND - Handy Black", cantidad: 6},
+                { value: "0002HAND|Dessata Handy Seahorse Hairbrush", display: "0002HAND - Handy Seahorse", cantidad: 6},
+                { value: "0003HAND|Dessata Handy Velvet Hairbrush", display: "0003HAND - Handy Velvet", cantidad: 6},
+                { value: "0004HAND|Dessata Handy Violet Hairbrush", display: "0004HAND - Handy Violet", cantidad: 6},
+                { value: "0024SURT|Display unit 10 Dessata hair brushes Catalina Estrada", display: "0024SURT - Display unit 10 Catalina Estrada", cantidad: 1},
+                { value: "0023SURT|Display unit 20 Dessata hair brushes Biocomp", display: "0023SURT - Display unit 20 Biocomp", cantidad: 1},
+                { value: "0009SURT|Display unit BRIGHT hair brushes + hair treatments", display: "0009SURT - Display unit BRIGHT", cantidad: 1},
+                { value: "0005SURT|TOP10 Assortment of Dessata Maxi Colours Hairbrushes", display: "0005SURT - Assortment Maxi Colours", cantidad: 1},
+                { value: "0006SURT|TOP10 Assortment of Dessata Mini Colours Hairbrushes", display: "0006SURT - Assortment Mini Colours", cantidad: 1},
+                { value: "0018SURT|Display 30 Dessata detangling hairbrushes", display: "0018SURT - Display 30 hairbrushes", cantidad: 1},
+                { value: "0003SURT|Assorted Set of 10 Dessata Prints Maxi Hairbrushes", display: "0003SURT - Assorted Set 10 Print Maxi", cantidad: 1},
+                { value: "0025SURT|Assorted Set of 10 Dessata Prints Mini Hairbrushes", display: "0025SURT - Assorted Set 10 Print Mini", cantidad: 1},
+                { value: "0026SURT|Display stand 8 Dessata detangling hair brushes", display: "0026SURT - Display unit 8", cantidad: 1},
+                { value: "0027SURT|Display stand 20 Dessata detangling hair brushes", display: "0027SURT - Display unit 20", cantidad: 1},
+                { value: "0003HBOW|White Dessata scrunchie with black dots", display: "0003HBOW - White Scrunchie with black dots", cantidad: 60},
+                { value: "0004HBOW|Black Dessata scrunchie with white dots", display: "0004HBOW - Black Scrunchie with white dots", cantidad: 60},
+                { value: "0002HBOW|Dessata Blue Stripes Scrunchie", display: "0002HBOW - Blue Stripes Scrunchie", cantidad: 60},
+                { value: "0001HBOW|Dessata Pink Stripes Scrunchie", display: "0001HBOW - Pink Stripes Scrunchie", cantidad: 60},
+                { value: "0005HBOW|Blue tie-dye Dessata scrunchie", display: "0005HBOW - Blue tie-dye Scrunchie", cantidad: 78},
+                { value: "0006HBOW|Purple tie-dye Dessata Scrunchie", display: "0006HBOW - Purple tie-dye Scrunchie", cantidad: 78},
+                { value: "0003RING|No-pulling hair tie Fuchsia 6u.", display: "0003RING - Scrunchie Fuchsia 6u.", cantidad: 36},
+                { value: "0004RING|No-pulling hair tie Fuchsia Metal 6u.", display: "0004RING - Scrunchie Fuchsia Metal 6u.", cantidad: 36},
+                { value: "0018RING|No-pulling hair tie Lilac Metal 6u.", display: "0018RING - Scrunchie Lilac Metal 6 uds.", cantidad: 36},
+                { value: "0005RING|No-pulling hair tie Gold Metal 6u.", display: "0005RING - Scrunchie Gold Metal 6u.", cantidad: 36},
+                { value: "0001RING|No-pulling hair tie Rainbow 6u.", display: "0001RING - Scrunchie Rainbow 6u.", cantidad: 36},
+                { value: "0007RING|No-pulling hair tie Turquoise Metal 6u.", display: "0007RING - Scrunchie Turquoise Metal 6u.", cantidad: 36},
+                { value: "0011RING|No-pulling hair tie Unicorn 6u.", display: "0011RING - Scrunchie Unicorn 6u.", cantidad: 36},
+                { value: "0012RING|No-pulling hair tie Black 6u.", display: "0012RING - Scrunchie Black 6u.", cantidad: 36},
+                { value: "0004HPIN|Dessata Black Hairpins", display: "0004HPIN - Black Hairpins", cantidad: 36},
+                { value: "0001HPIN|Dessata Pink Hairpins", display: "0001HPIN - Pink Hairpins", cantidad: 36},
+                { value: "0003HPIN|Dessata Green Hairpins", display: "0003HPIN - Green Hairpins", cantidad: 36},
+                { value: "0002HPIN|Dessata Violet Hairpins", display: "0002HPIN - Violet Hairpins", cantidad: 36},
+                { value: "0001CLIP|Dessata Blue Half-Moon Hair Clip", display: "0001CLIP - Blue Half-Moon Clip", cantidad: 24},
+                { value: "0003CLIP|Dessata White Half-Moon Hair Clip", display: "0003CLIP - White Half-Moon Clip", cantidad: 24},
+                { value: "0002CLIP|Dessata Turquoise Half-Moon Hair Clip", display: "0002CLIP - Turquoise Half-Moon Clip", cantidad: 24},
+                { value: "0006CLIP|Dessata Brown Half-Moon Hair Clip", display: "0006CLIP - Brown Half-Moon Clip", cantidad: 24},
+                { value: "0005CLIP|Dessata Purple Half-Moon Hair Clip", display: "0005CLIP - Purple Half-Moon Clip", cantidad: 24},
+                { value: "0004CLIP|Dessata Pink Half-Moon Hair Clip", display: "0004CLIP - Pink Half-Moon Clip", cantidad: 24},
+                { value: "EX DET|Detangler Display Stand", display: "EX DET - Detangler Display Stand", cantidad: 1},
+                { value: "EX CATA|Catalina Estrada Table Top Display Unit", display: "EX CATA - Catalina Estrada Table Top", cantidad: 1},
+                { value: "EX BIOCOMP|Dessata BIOCOMP Table Top Display Unit", display: "EX BIOCOMP - BIOCOMP Table Top", cantidad: 1},
+                { value: "EX SPP COL|SPECIAL COLOURS Table Top Display Unit", display: "EX SPP COL - SPECIAL COLOURS Table Top", cantidad: 1},
+                { value: "EX SPP PRO|SPECIAL PROFESSIONAL Table Top Display Unit", display: "EX SPP PRO - SPECIAL PROFESSIONAL Table Top", cantidad: 1},
+                { value: "EX PPB|PREMIUM BRIGHT Table Top Display Unit", display: "EX PPB - PROFESSIONAL BRIGHT Table Top", cantidad: 1},
+                { value: "EX PPP|PREMIUM COLOURS Table Top Display Unit", display: "EX PPP - PREMIUM COLOURS Table Top", cantidad: 1},
+                { value: "EX BP|Dessata Paper Bag", display: "EX BP - Dessata Paper Bag", cantidad: 1},
+                { value: "EX BD|Dessata Cardboard Bag", display: "EX BD - Dessata Cardboard Bag", cantidad: 1},
+                { value: "EX NEC|Dessata Fuchsia Dressing Bag", display: "EX NEC - Dessata Fuchsia Dressing Bag", cantidad: 1},
+                { value: "EX DIP BIOCOMP|Dessata BIOCOMP Leaflet", display: "EX DIP BIOCOMP - Dessata BIOCOMP Leaflet", cantidad: 1},
+                { value: "EX LAMINA|Campaign Explanation Sheet", display: "EX LAMINA - Campaign Explanation Sheet", cantidad: 1},
+                { value: "EX DISP BIOCOMP|Dessata BIOCOMP Display", display: "EX DISP BIOCOMP - Dessata BIOCOMP Display", cantidad: 1},
+                { value: "EX POSTER BIOCOMP|Dessata BIOCOMP Poster", display: "EX POSTER BIOCOMP - Dessata BIOCOMP Poster", cantidad: 1},
+                { value: "EX POSTER|Special Edition Campaign Poster", display: "EX POSTER - Special Edition Campaign Poster", cantidad: 1},
+                { value: "EX REV|Dessata DINA5 Magazine", display: "EX REV - Dessata DINA5 Magazine", cantidad: 1},
+                { value: "0022SURT|Hair Treatment Pack", display: "0022SURT - Hair Treatment Pack", cantidad: 1},
+                { value: "0016SURT|No-Pulling Hair Tie Display Unit, 36 boxes of 6 units.", display: "0016SURT - Unit 36 boxes 6 units", cantidad: 1},
+                { value: "0017SURT|Dessata Brand Implantation Pack", display: "0017SURT - Brand Implantation Pack", cantidad: 1}
+            ],
+            it: [
+                { value: "4703MAXI|Spazzola per capelli Dessata Maxi Aloha-Ciliegia", display: "4703MAXI - Maxi Aloha-Ciliegia", cantidad: 10 },
+                { value: "5007MAXI|Spazzola per capelli Dessata Maxi Blu-Turchese", display: "5007MAXI - Maxi Blu-Turchese", cantidad: 10 },
+                { value: "6769MAXI|Spazzola per capelli Dessata Maxi Catalina Estrada", display: "6769MAXI - Maxi Catalina Estrada", cantidad: 10},
+                { value: "1410MAXI|Spazzola per capelli Dessata Maxi Fucsia Metal-Nero", display: "1410MAXI - Maxi Fucsia Metal-Nero", cantidad: 10},
+                { value: "1410STAR|Spazzola per capelli Dessata Maxi Fucsia Metal-Nero Prisma", display: "1410STAR - Maxi Fucsia Metal-Nero Prisma", cantidad: 8},
+                { value: "6468MAXI|Spazzola per capelli Dessata Maxi Meduse-Fucsia", display: "6468MAXI - Maxi Meduse-Fucsia", cantidad: 10},
+                { value: "1010MAXI|Spazzola per capelli Dessata Maxi Nero-Nero", display: "1010MAXI - Maxi Nero-Nero", cantidad: 10},
+                { value: "6567MAXI|Spazzola per capelli Dessata Maxi New Catrina-Granata", display: "6567MAXI - Maxi New Catrina-Granata", cantidad: 10},
+                { value: "1610MAXI|Spazzola per capelli Dessata Maxi Oro Rosa Metal-Nero", display: "1610MAXI - Maxi Oro Rosa Metal-Nero", cantidad: 10},
+                { value: "1610STAR|Spazzola per capelli Dessata Maxi Oro Rosa Metal-Nero Prisma", display: "1610STAR - Maxi Oro Rosa Metal-Nero Prisma", cantidad: 8},
+                { value: "0413MAXI|Spazzola per capelli Dessata Maxi Rosa-Argento", display: "0413MAXI - Maxi Rosa-Argento", cantidad: 10},
+                { value: "5107MAXI|Spazzola per capelli Dessata Maxi Sakura-Turchese", display: "5107MAXI - Maxi Sakura-Turchese", cantidad: 10},
+                { value: "SW1410MAXI|Spazzola per capelli Dessata Maxi Swarovski Official Fucsia", display: "SW1410MAXI - Maxi Swarovski Official Fucsia", cantidad: 8},
+                { value: "4010MAXI|Spazzola per capelli Dessata Maxi Turchese Metal-Nero", display: "4010MAXI - Maxi Turchese Metal-Nero", cantidad: 10},
+                { value: "5470MAXI|Spazzola per capelli Dessata Maxi Velvet-Rosa", display: "5470MAXI - Maxi Velvet-Rosa", cantidad: 10},
+                { value: "5344MAXI|Spazzola per capelli Dessata Maxi Verde-Rosa", display: "5344MAXI - Maxi Verde-Rosa", cantidad: 10},
+                { value: "5245MAXI|Spazzola per capelli Dessata Maxi Viola-Lilla", display: "5245MAXI - Maxi Viola-Lilla", cantidad: 10},
+                { value: "4703MINI|Spazzola per capelli Dessata Mini Aloha-Cherry", display: "4703MINI - Mini Aloha-Cherry", cantidad: 10},
+                { value: "5007MINI|Spazzola per capelli Dessata Mini Blu-Turchese", display: "5007MINI - Mini Blu-Turchese", cantidad: 10},
+                { value: "1911MINI|Spazzola per capelli Dessata Mini Barber Nero-Oro", display: "1911MINI - Mini Barber Nero-Oro", cantidad: 10},
+                { value: "MP0006MINI|Spazzola per capelli Dessata Mini Barber Nero-Argento", display: "MP0006MINI - Mini Barber Nero-Argento", cantidad: 10},
+                { value: "0942MINI|Spazzola per capelli Dessata Mini Bianco-Corallo", display: "0942MINI - Mini Bianco-Corallo", cantidad: 10},
+                { value: "0902MINI|Spazzola per capelli Dessata Mini Bianco-Mandarino", display: "0902MINI - Mini Bianco-Mandarino", cantidad: 10},
+                { value: "1706MINI|Spazzola per capelli Dessata Mini Catrinas-Viola", display: "1706MINI - Mini Catrinas-Viola", cantidad: 10},
+                { value: "440310MINI|Spazzola per capelli Dessata Mini Dolce Vita-Cherry-Nero", display: "440310MINI - Mini Dolce Vita-Cherry-Nero", cantidad: 10},
+                { value: "1410MINI|Spazzola per capelli Dessata Mini Fucsia Metal-Nero", display: "1410MINI - Mini Fucsia Metal-Nero", cantidad: 10},
+                { value: "050108MINI|Spazzola per capelli Dessata Mini Fucsia-Giallo-Lime", display: "050108MINI - Mini Fucsia-Giallo-Lime", cantidad: 10},
+                { value: "050608MINI|Spazzola per capelli Dessata Mini Fucsia-Viola-Lime", display: "050608MINI - Mini Fucsia-Viola-Lime", cantidad: 10},
+                { value: "0510MINI|Spazzola per capelli Dessata Mini Fucsia-Nero", display: "0510MINI - Mini Fucsia-Nero", cantidad: 10},
+                { value: "1810MINI|Spazzola per capelli Dessata Mini Leopardo-Nero", display: "1810MINI - Mini Leopardo-Nero", cantidad: 10},
+                { value: "430605MINI|Spazzola per capelli Dessata Mini Love-Viola-Fucsia", display: "430605MINI - Mini Love-Viola-Fucsia", cantidad: 10},
+                { value: "2013MINI|Spazzola per capelli Dessata Mini Farfalle-Argento", display: "2013MINI - Mini Farfalle-Argento", cantidad: 10},
+                { value: "1905MINI|Spazzola per capelli Dessata Mini Meow-Giallo-Fucsia", display: "1905MINI - Mini Meow-Giallo-Fucsia", cantidad: 10},
+                { value: "6101MINI|Spazzola per capelli Dessata Mini Music-Giallo Fluo", display: "6101MINI - Mini Music-Giallo Fluo", cantidad: 10},
+                { value: "100810MINI|Spazzola per capelli Dessata Mini Nero-Lime-Nero", display: "100810MINI - Mini Nero-Lime-Nero", cantidad: 10},
+                { value: "1010MINI|Spazzola per capelli Dessata Mini Nero-Nero", display: "1010MINI - Mini Nero-Nero", cantidad: 10},
+                { value: "101210MINI|Spazzola per capelli Dessata Mini Nero-Oro Antico-Nero", display: "101210MINI - Mini Nero-Oro Antico-Nero", cantidad: 10},
+                { value: "100710MINI|Spazzola per capelli Dessata Mini Nero-Turchese-Nero", display: "100710MINI - Mini Nero-Turchese-Nero", cantidad: 10},
+                { value: "1210MINI|Spazzola per capelli Dessata Mini Oro Antico-Nero", display: "1210MINI - Mini Oro Antico-Nero", cantidad: 10},
+                { value: "1610MINI|Spazzola per capelli Dessata Mini Oro Rosa", display: "1610MINI - Mini Oro Rosa", cantidad: 10},
+                { value: "1205MINI|Spazzola per capelli Dessata Mini Oro Antico-Fucsia-Fucsia", display: "1205MINI - Mini Oro Antico-Fucsia-Fucsia", cantidad: 10},
+                { value: "120512MINI|Spazzola per capelli Dessata Mini Oro Antico-Fucsia-Oro Antico", display: "120512MINI - Mini Oro Antico-Fucsia-Oro Antico", cantidad: 10},
+                { value: "121012MINI|Spazzola per capelli Dessata Mini Oro Antico-Nero-Oro Antico", display: "121012MINI - Mini Oro Antico-Nero-Oro Antico", cantidad: 10},
+                { value: "1110MINI|Spazzola per capelli Dessata Mini Oro-Nero", display: "1110MINI - Mini Oro-Nero", cantidad: 10},
+                { value: "1111MINI|Spazzola per capelli Dessata Mini Oro-Oro", display: "1111MINI - Mini Oro-Oro", cantidad: 10},
+                { value: "041305MINI|Spazzola per capelli Dessata Mini Rosa-Argento-Fucsia", display: "041305MINI - Mini Rosa-Argento-Fucsia", cantidad: 10},
+                { value: "510507MINI|Spazzola per capelli Dessata Mini Sakura-Fucsia-Turchese", display: "510507MINI - Mini Sakura-Fucsia-Turchese", cantidad: 10},
+                { value: "355937MINI|Spazzola per capelli Dessata Mini Summer Fucsia-Turchese", display: "355937MINI - Mini Summer Fucsia-Turchese", cantidad: 10},
+                { value: "4010MINI|Spazzola per capelli Dessata Mini Turchese Metal-Nero", display: "4010MINI - Mini Turchese Metal-Nero", cantidad: 10},
+                { value: "0742MINI|Spazzola per capelli Dessata Mini Turchese-Corallo", display: "0742MINI - Mini Turchese-Corallo", cantidad: 10},
+                { value: "070506MINI|Spazzola per capelli Dessata Mini Turchese-Fucsia-Viola", display: "070506MINI - Mini Turchese-Fucsia-Viola", cantidad: 10},
+                { value: "1804MINI|Spazzola per capelli Dessata Mini Unicorn-Rosa Glitter", display: "1804MINI - Mini Unicorn-Rosa Glitter", cantidad: 10},
+                { value: "0803MINI|Spazzola per capelli Dessata Mini Verde-Cherry", display: "0803MINI - Mini Verde-Cherry", cantidad: 10},
+                { value: "5007ORIG|Spazzola per capelli Dessata Original Blu-Turchese", display: "5007ORIG - Original Blu-Turchese", cantidad: 10},
+                { value: "0501ORIG|Spazzola per capelli Dessata Original Fucsia-Giallo", display: "0501ORIG - Original Fucsia-Giallo", cantidad: 10},
+                { value: "5245ORIG|Spazzola per capelli Dessata Original Lilla-Viola", display: "5245ORIG - Original Lilla-Viola", cantidad: 10},
+                { value: "6468ORIG|Spazzola per capelli Dessata Original Meduse-Fucsia", display: "6468ORIG - Original Meduse-Fucsia", cantidad: 10},
+                { value: "6101ORIG|Spazzola per capelli Dessata Original Music-Giallo", display: "6101ORIG - Original Music-Giallo", cantidad: 10},
+                { value: "1010ORIG|Spazzola per capelli Dessata Original Nero-Nero", display: "1010ORIG - Original Nero-Nero", cantidad: 10},
+                { value: "6567ORIG|Spazzola per capelli Dessata Original New Catrina-Granata", display: "6567ORIG - Original New Catrina-Granata", cantidad: 10},
+                { value: "2927ORIG|Spazzola per capelli Dessata Original Turchese Pastello-Rosa", display: "2927ORIG - Original Turchese Pastello-Rosa", cantidad: 10},
+                { value: "5344ORIG|Spazzola per capelli Dessata Original Verde-Rosa", display: "5344ORIG - Original Verde-Rosa", cantidad: 10},
+                { value: "DET0307MINI|Spazzola per capelli Detangler Mini Baby Bunny", display: "DET0307MINI - Mini Baby Bunny", cantidad: 14},
+                { value: "DET0206MINI|Spazzola per capelli Detangler Mini Baby Foxy", display: "DET0206MINI - Mini Baby Foxy", cantidad: 14},
+                { value: "DET0105MINI|Spazzola per capelli Detangler Mini Baby Pony", display: "DET0105MINI - Mini Baby Pony", cantidad: 14},
+                { value: "DET3030MINI|Spazzola per capelli Detangler Mini Fragola", display: "DET3030MINI - Mini Fragola", cantidad: 14},
+                { value: "DET3232MINI|Spazzola per capelli Detangler Mini Lavanda", display: "DET3232MINI - Mini Lavanda", cantidad: 14},
+                { value: "DET5104MINI|Spazzola per capelli Detangler Mini Lilla-Argento-Rosa", display: "DET5104MINI - Mini Lilla-Argento-Rosa", cantidad: 14},
+                { value: "DET3131MINI|Spazzola per capelli Detangler Mini Vaniglia", display: "DET3131MINI - Mini Vaniglia", cantidad: 14},
+                { value: "DET7805ORIG|Spazzola per capelli Detangler Original Bicycle", display: "DET7805ORIG - Original Bicycle", cantidad: 12},
+                { value: "DET7502ORIG|Spazzola per capelli Detangler Original Butterfly", display: "DET7502ORIG - Original Butterfly", cantidad: 12},
+                { value: "DET6806ORIG|Spazzola per capelli Detangler Original Fem Silhouette", display: "DET6806ORIG - Original Fem Silhouette", cantidad: 12},
+                { value: "DET4810ORIG|Spazzola per capelli Detangler Original Fucsia Satinato-Nero", display: "DET4810ORIG - Original Fucsia Satinato-Nero", cantidad: 12},
+                { value: "DET0562ORIG|Spazzola per capelli Detangler Original Fucsia-Blu", display: "DET0562ORIG - Original Fucsia-Blu", cantidad: 12},
+                { value: "DET0605ORIG|Spazzola per capelli Detangler Original Viola-Fucsia", display: "DET0605ORIG - Original Viola-Fucsia", cantidad: 12},
+                { value: "DET0608ORIG|Spazzola per capelli Detangler Original Viola-Lime", display: "DET0608ORIG - Original Viola-Lime", cantidad: 12},
+                { value: "DET7910ORIG|Spazzola per capelli Detangler Original Rock N Roll", display: "DET7910ORIG - Original Rock N Roll", cantidad: 12},
+                { value: "DET0405ORIG|Spazzola per capelli Detangler Original Rosa-Fucsia", display: "DET0405ORIG - Original Rosa-Fucsia", cantidad: 12},
+                { value: "DET0424ORIG|Spazzola per capelli Detangler Original Rosa-Granata", display: "DET0424ORIG - Original Rosa-Granata", cantidad: 12},
+                { value: "DET0406ORIG|Spazzola per capelli Detangler Original Rosa-Viola", display: "DET0406ORIG - Original Rosa-Viola", cantidad: 12},
+                { value: "DET7207ORIG|Spazzola per capelli Detangler Original Little Mermaid", display: "DET7207ORIG - Original Little Mermaid", cantidad: 12},
+                { value: "DET7690ORIG|Spazzola per capelli Detangler Original Snowboard", display: "DET7690ORIG - Original Snowboard", cantidad: 12},
+                { value: "DET7703ORIG|Spazzola per capelli Detangler Original Teen Bubble Gum", display: "DET7703ORIG - Original Teen Bubble Gum", cantidad: 12},
+                { value: "DET8068ORIG|Spazzola per capelli Detangler Original Teen Bunny", display: "DET8068ORIG - Original Teen Bunny", cantidad: 12},
+                { value: "DET8104ORIG|Spazzola per capelli Detangler Original Teen Curly", display: "DET8104ORIG - Original Teen Curly", cantidad: 12},
+                { value: "DET7009ORIG|Spazzola per capelli Detangler Original The Future is Female", display: "DET7009ORIG - Original The Future is Female", cantidad: 12},
+                { value: "DET4910ORIG|Spazzola per capelli Detangler Original Turchese Satinato-Nero", display: "DET4910ORIG - Original Turchese Satinato-Nero", cantidad: 12},
+                { value: "DET7105ORIG|Spazzola per capelli Detangler Original Unicorn", display: "DET7105ORIG - Original Unicorn", cantidad: 12},
+                { value: "BIO0001|Spazzola per capelli Dessata BIOCOMP Menta Compostabile", display: "BIO0001 - BIOCOMP Menta", cantidad: 10},
+                { value: "0001HAND|Spazzola per capelli con manico Dessata Handy Cheetah", display: "0001HAND - Handy Cheetah", cantidad: 6},
+                { value: "0006HAND|Spazzola per capelli con manico Dessata Handy Menta", display: "0006HAND - Handy Menta", cantidad: 6},
+                { value: "0005HAND|Spazzola per capelli con manico Dessata Handy Nero", display: "0005HAND - Handy Nero", cantidad: 6},
+                { value: "0002HAND|Spazzola per capelli con manico Dessata Handy Seahorse", display: "0002HAND - Handy Seahorse", cantidad: 6},
+                { value: "0003HAND|Spazzola per capelli con manico Dessata Handy Velvet", display: "0003HAND - Handy Velvet", cantidad: 6},
+                { value: "0004HAND|Spazzola per capelli con manico Dessata Handy Viola", display: "0004HAND - Handy Viola", cantidad: 6},
+                { value: "0024SURT|Espositore 10 spazzole per capelli Dessata Catalina Estrada", display: "0024SURT - Espositore 10 Catalina Estrada", cantidad: 1},
+                { value: "0023SURT|Espositore 20 spazzole per capelli Dessata Biocomp", display: "0023SURT - Espositore 20 Biocomp", cantidad: 1},
+                { value: "0009SURT|Espositore BRIGHT spazzole per capelli + trattamenti per capelli", display: "0009SURT - Espositore BRIGHT", cantidad: 1},
+                { value: "0005SURT|Assortimento TOP10 di spazzole per capelli Dessata Maxi Colours", display: "0005SURT - Assortimento Maxi Colours", cantidad: 1},
+                { value: "0006SURT|Assortimento TOP10 di spazzole per capelli Dessata Mini Colours", display: "0006SURT - Assortimento Mini Colours", cantidad: 1},
+                { value: "0018SURT|Espositore da 30 spazzole districanti per capelli Dessata", display: "0018SURT - Espositore 30 spazzole", cantidad: 1},
+                { value: "0003SURT|Assortimento variato 10 spazzole per capelli Dessata Prints Maxi", display: "0003SURT - Assortimento 10 Prints Maxi", cantidad: 1},
+                { value: "0025SURT|Assortimento variato 10 spazzole per capelli Dessata Prints Mini", display: "0025SURT - Assortimento 10 Prints Mini", cantidad: 1},
+                { value: "0026SURT|Espositore 8 spazzole districanti per capelli Dessata", display: "0026SURT - Espositore 8", cantidad: 1},
+                { value: "0027SURT|Espositore 20 spazzole districanti per capelli Dessata", display: "0027SURT - Espositore 20", cantidad: 1},
+                { value: "0003HBOW|Elastico per capelli in tessuto Dessata Bianco con pois neri", display: "0003HBOW - Elastico Bianco con pois neri", cantidad: 60},
+                { value: "0004HBOW|Elastico per capelli in tessuto Dessata Nero con pois bianco", display: "0004HBOW - Elastico Nero con pois bianco", cantidad: 60},
+                { value: "0002HBOW|Elastico per capelli in tessuto Dessata a strisce Blu", display: "0002HBOW - Elastico Strice Blu", cantidad: 60},
+                { value: "0001HBOW|Elastico per capelli di tessuto Dessata a strisce Rosa", display: "0001HBOW - Elastico Strisce Rosa", cantidad: 60},
+                { value: "0005HBOW|Elastico per capelli in tessuto tie-dye Dessata Blu", display: "0005HBOW - Elastico tie-dye Blu", cantidad: 78},
+                { value: "0006HBOW|Elastico per capelli in tessuto tie-dye Dessata Viola", display: "0006HBOW - Elastico tie-dye Viola", cantidad: 78},
+                { value: "0003RING|Elastico con buona presa Fucsia 6u.", display: "0003RING - Elastico Fucsia 6u.", cantidad: 36},
+                { value: "0004RING|Elastico con buona presa Fucsia Metal 6u.", display: "0004RING - Elastico Fucsia Metal 6u.", cantidad: 36},
+                { value: "0018RING|Elastico con buona presa Lilla Metal 6u.", display: "0018RING - Elastico Lilla Metal 6u.", cantidad: 36},
+                { value: "0005RING|Elastico con buona presa Oro Metal 6u.", display: "0005RING - Elastico Oro Metal 6u.", cantidad: 36},
+                { value: "0001RING|Elastico con buona presa Rainbow 6u.", display: "0001RING - Elastico Rainbow 6 u.", cantidad: 36},
+                { value: "0007RING|Elastico con buona presa Turchese Metal 6u.", display: "0007RING - Elastico Turchese Metal 6u.", cantidad: 36},
+                { value: "0011RING|Elastico con buona presa Unicorno 6u.", display: "0011RING - Elastico Unicorno 6u.", cantidad: 36},
+                { value: "0012RING|Elastico con buona presa Nero 6u.", display: "0012RING - Elastico Nero 6u.", cantidad: 36},
+                { value: "0004HPIN|Forcine per capelli Dessata Nero", display: "0004HPIN - Forcine Nero", cantidad: 36},
+                { value: "0001HPIN|Forcine per capelli Dessata Rosa", display: "0001HPIN - Forcine Rosa", cantidad: 36},
+                { value: "0003HPIN|Forcine per capelli Dessata Verde", display: "0003HPIN - Horquillas Verde", cantidad: 36},
+                { value: "0002HPIN|Forcine per capelli Dessata Viola", display: "0002HPIN - Horquillas Viola", cantidad: 36},
+                { value: "0001CLIP|Pinza per capelli Dessata Mezzaluna Blu", display: "0001CLIP - Pinza Mezzaulna Blu", cantidad: 24},
+                { value: "0003CLIP|Pinza per capelli Dessata Mezzaluna Bianca", display: "0003CLIP - Pinza Mezzaulna Bianca", cantidad: 24},
+                { value: "0002CLIP|Pinza per capelli Dessata Mezzaluna Turquese", display: "0002CLIP - Pinza Mezzaulna Turquese", cantidad: 24},
+                { value: "0006CLIP|Pinza per capelli Dessata Mezzaluna Marrone", display: "0006CLIP - Pinza Mezzaulna Marrone", cantidad: 24},
+                { value: "0005CLIP|Pinza per capelli Dessata Mezzaluna Viola", display: "0005CLIP - Pinza Mezzaulna Viola", cantidad: 24},
+                { value: "0004CLIP|Pinza per capelli Dessata Mezzaluna Rosa", display: "0004CLIP - Pinza Mezzaulna Rosa", cantidad: 24},
+                { value: "EX DET|Espositore Detangler", display: "EX DET - Espositore Detangler", cantidad: 1},
+                { value: "EX CATA|Espositore da banco Catalina Estrada", display: "EX CATA - Expositore Catalina Estrada", cantidad: 1},
+                { value: "EX BIOCOMP|Espositore da banco Dessata BIOCOMP", display: "EX BIOCOMP - Expositore BIOCOMP", cantidad: 1},
+                { value: "EX SPP COL|Espositore da banco ESPECIAL COLOURS", display: "EX SPP COL - Expositore ESPECIAL COLOURS", cantidad: 1},
+                { value: "EX SPP PRO|Espositore da banco ESPECIAL PROFESSIONAL", display: "EX SPP PRO - Expositore ESPECIAL PROFESSIONAL", cantidad: 1},
+                { value: "EX PPB|Espositore da banco PREMIUM BRIGHT", display: "EX PPB - Expositore PREMIUM BRIGHT", cantidad: 1},
+                { value: "EX PPP|Espositore da banco PREMIUM COLOURS", display: "EX PPP - Expositor PREMIUM COLOURS", cantidad: 1},
+                { value: "EX SPN|Espositore da terra a ripiani", display: "EX SPN - Espositore da terra a ripiani", cantidad: 1},
+                { value: "EX BP|Borsa di carta Dessata", display: "EX BP - Borsa di carta Dessata", cantidad: 1},
+                { value: "EX BD|Borsa in cartone Dessata", display: "EX BD - Borsa in cartone Dessata", cantidad: 1},
+                { value: "EX NEC|Beauty Bag Dessata Fucsia", display: "EX NEC - Beauty Bag Dessata Fucsia", cantidad: 1},
+                { value: "EX DIP BIOCOMP|Diptico Dessata BIOCOMP", display: "EX DIP BIOCOMP - Diptico Dessata BIOCOMP", cantidad: 1},
+                { value: "EX LAMINA|Foglio esplicativo della Campagna", display: "EX LAMINA - Foglio esplicativo della Campagna", cantidad: 1},
+                { value: "EX DISP BIOCOMP|Poster Dessata BIOCOMP", display: "EX DISP BIOCOMP - Poster Dessata BIOCOMP", cantidad: 1},
+                { value: "EX POSTER|Poster edizione speciale Campagna", display: "EX POSTER - Poster edizione speciale Campagna", cantidad: 1},
+                { value: "EX REV|Rivista DINA5 Dessata", display: "EX REV - Rivista DINA5 Dessata", cantidad: 1},
+                { value: "0022SURT|Pack Trattamenti Capelli", display: "0022SURT - Pack Trattamenti Capelli", cantidad: 1},
+                { value: "0016SURT|Espositore per elastico con buona presa. 36 astucci di 6 pezzi", display: "0016SURT - Expositore elastico 36 astucci 6u.", cantidad: 1},
+                { value: "0017SURT|Pack di implementazione Dessata", display: "0017SURT - Pack di implementazione Dessata", cantidad: 1}
+            ]
+        };
+
+        function actualizarBotonesEliminar() {
+            const opciones = document.querySelectorAll("#opcionesContainer .opcionItem .eliminar");
+            opciones.forEach(boton => boton.style.display = opciones.length > 0 ? "inline-block" : "none");
+        }
+
+        function agregarOpcion() {
+            const container = document.getElementById("opcionesContainer");
+            const div = document.createElement("div");
+            div.classList.add("opcionItem");
+            div.innerHTML = `
+                <div><strong>Opción ${opcionCounter}</strong></div>
+                <div class="idioma-container">
+                    <label for="idioma">Idioma:</label>
+                    <select class="idioma" style="width: 100%;" onchange="cambiarIdioma(this)">
+                    <option value="es">Español</option>
+                    <option value="en">Inglés</option>
+                    <option value="it">Italiano</option> <!-- Añadir esta línea -->
+                </select>
+                </div>
+                <div class="search-container">
+                    <input type="text" placeholder="Buscar etiqueta..." onkeyup="filtrarOpciones(this)">
+                    <div class="resultados"></div>
+                </div>
+                <div class="cantidad-container">
+                    <label for="cantidad">Unidades:</label>
+                    <input type="number" class="cantidad" min="1" value="10">
+                </div>
+                <div class="etiquetas-container">
+                    <label for="numEtiquetas">Número de etiquetas:</label>
+                    <input type="number" class="numEtiquetas" min="1" value="1">
+                </div>
+                <button class="eliminar" onclick="eliminarOpcion(this)">Eliminar</button>
+            `;
+            container.appendChild(div);
+            opcionCounter++;
+            setTimeout(() => div.classList.add('show'), 10);
+            actualizarBotonesEliminar();
+            actualizarScroll();
+        }
+
+        function filtrarOpciones(input) {
+            const searchValue = input.value.toLowerCase();
+            const resultados = input.nextElementSibling;
+            const idioma = input.parentElement.previousElementSibling.querySelector('.idioma').value;
+            resultados.innerHTML = "";
+            if (searchValue) {
+                const filteredEtiquetas = etiquetas[idioma].filter(etiqueta => etiqueta.display.toLowerCase().includes(searchValue));
+                filteredEtiquetas.forEach(etiqueta => {
+                    const div = document.createElement("div");
+                    div.classList.add("resultado-item");
+                    div.textContent = etiqueta.display;
+                    div.onclick = () => seleccionarEtiqueta(input, etiqueta);
+                    resultados.appendChild(div);
+                });
+                resultados.style.display = "block";
+            } else {
+                resultados.style.display = "none";
+            }
+        }
+
+        function seleccionarEtiqueta(input, etiqueta) {
+            input.value = etiqueta.display;
+            const cantidadInput = input.parentElement.nextElementSibling.querySelector('.cantidad');
+            cantidadInput.value = etiqueta.cantidad;
+            input.setAttribute('data-full-value', etiqueta.value);
+            input.nextElementSibling.style.display = "none";
+        }
+
+        function cambiarIdioma(selectElement) {
+            const input = selectElement.parentElement.nextElementSibling.querySelector('input');
+            input.value = "";
+            input.nextElementSibling.style.display = "none";
+        }
+
+        function eliminarOpcion(button) {
+            const opcionItem = button.parentElement;
+            opcionItem.classList.remove('show');
+            setTimeout(() => {
+                opcionItem.remove();
+                actualizarBotonesEliminar();
+                actualizarScroll();
+                actualizarEnumeracion();
+            }, 300);
+        }
+
+        function actualizarScroll() {
+            const container = document.getElementById("opcionesContainer");
+            if (container.children.length > 1) {
+                container.style.overflowY = 'auto';
+            } else {
+                container.style.overflowY = 'hidden';
+            }
+        }
+
+        function actualizarEnumeracion() {
+            const opcionItems = document.querySelectorAll("#opcionesContainer .opcionItem");
+            opcionItems.forEach((item, index) => {
+                const numero = item.querySelector("strong");
+                numero.innerText = `Opción ${index + 1}`;
+            });
+            opcionCounter = opcionItems.length + 1;
+        }
+
+        function previsualizarPDF() {
+    const preview = document.getElementById("preview");
+    preview.innerHTML = "";
+    let x = 0, y = 3.5;
+    const etiquetaAncho = 105, etiquetaAlto = 29;
+    const etiquetasPorFila = 2;
+    const etiquetasPorColumna = 10;
+    const etiquetasPorHoja = etiquetasPorFila * etiquetasPorColumna;
+    let etiquetasGeneradas = 0;
+    let pageCount = 0;
+
+    document.querySelectorAll("#opcionesContainer .opcionItem").forEach(div => {
+        const opcion = div.querySelector(".search-container input").getAttribute('data-full-value');
+        const cantidad = div.querySelector(".cantidad").value;
+        const numEtiquetas = div.querySelector(".numEtiquetas").value;
+        const [reference, productNameText] = opcion.split('|');
+        const unidadesTexto = `${cantidad} Uds.`;
+
+        for (let i = 0; i < numEtiquetas; i++) {
+            if (etiquetasGeneradas % etiquetasPorHoja === 0) {
+                pageCount++;
+                const pageWrapper = document.createElement("div");
+                pageWrapper.classList.add("page-wrapper");
+
+                const page = document.createElement("div");
+                page.classList.add("preview-page");
+
+                const pageNumber = document.createElement("div");
+                pageNumber.classList.add("page-number");
+                pageNumber.innerText = `Página ${pageCount}`;
+
+                pageWrapper.appendChild(page);
+                pageWrapper.appendChild(pageNumber);
+                preview.appendChild(pageWrapper);
+
+                y = 3.5;
+                x = 0;
+            }
+            const etiqueta = document.createElement("div");
+            etiqueta.classList.add("etiqueta");
+            etiqueta.style.left = x + "mm";
+            etiqueta.style.top = y + "mm";
+
+            etiqueta.innerHTML = `<div style="font-size: 10px; text-align: center;">${reference}</div><div class="titulo">${productNameText}</div><div class="unidades">${unidadesTexto}</div>`;
+
+            // Añadir imagen después de la tercera fila
+            const img = document.createElement("img");
+            img.src = `fotos/${reference}.png`;
+            img.classList.add("imagen");
+            img.style.marginTop = "0"; // Eliminar el margen superior
+            img.style.width = "calc(100% - 40mm)"; // Ajustar el ancho de la imagen
+            img.style.height = "10mm"; // Ajustar la altura de la imagen
+            etiqueta.appendChild(img);
+
+            preview.lastChild.firstChild.appendChild(etiqueta);
+            etiquetasGeneradas++;
+            x += etiquetaAncho;
+            if (etiquetasGeneradas % etiquetasPorFila === 0) {
+                x = 0;
+                y += etiquetaAlto;
+            }
+        }
+    });
+}
+
+function generarPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+    let x = 0, y = 3.5;
+    const etiquetaAncho = 105, etiquetaAlto = 29;
+    const etiquetasPorFila = 2;
+    const etiquetasPorHoja = 20;
+    let etiquetasGeneradas = 0;
+    let imagenesCargadas = 0;
+    let totalImagenes = 0;
+    
+    const opciones = document.querySelectorAll("#opcionesContainer .opcionItem");
+    
+    // Crear un objeto para almacenar imágenes cargadas
+    let imagenes = {};
+
+    // Primero, cargar todas las imágenes necesarias
+    opciones.forEach(div => {
+        const opcion = div.querySelector(".search-container input").getAttribute('data-full-value');
+        const [reference] = opcion.split('|');
+        const img = new Image();
+        img.src = `fotos/${reference}.png`;
+
+        img.onload = function () {
+            imagenes[reference] = img;
+            imagenesCargadas++;
+            if (imagenesCargadas === totalImagenes) {
+                // Cuando todas las imágenes estén listas, generar el PDF
+                generarEtiquetasPDF(doc, imagenes);
+            }
+        };
+
+        img.onerror = function () {
+            console.warn(`No se encontró la imagen para: ${reference}`);
+            imagenes[reference] = null; // Si no existe, guardamos `null`
+            imagenesCargadas++;
+            if (imagenesCargadas === totalImagenes) {
+                generarEtiquetasPDF(doc, imagenes);
+            }
+        };
+
+        totalImagenes++;
+    });
+
+    function generarEtiquetasPDF(doc, imagenes) {
+        opciones.forEach(div => {
+            const opcion = div.querySelector(".search-container input").getAttribute('data-full-value');
+            const cantidad = div.querySelector(".cantidad").value;
+            const numEtiquetas = div.querySelector(".numEtiquetas").value;
+            const [reference, productNameText] = opcion.split('|');
+            const unidadesTexto = `${cantidad} Uds.`;
+
+            for (let i = 0; i < numEtiquetas; i++) {
+                if (etiquetasGeneradas % etiquetasPorHoja === 0 && etiquetasGeneradas !== 0) {
+                    doc.addPage();
+                    y = 3.5;
+                    x = 0;
+                }
+
+                doc.setFontSize(8);
+                doc.text(reference, x + etiquetaAncho / 2, y + 4, { align: 'center' });
+                doc.setFontSize(10);
+                doc.text(productNameText, x + 5, y + 9);
+                doc.text(unidadesTexto, x + 5, y + 14);
+
+                // Añadir imagen si existe en el objeto `imagenes`
+                if (imagenes[reference]) {
+                    doc.addImage(imagenes[reference], 'PNG', x + 20, y + 16, etiquetaAncho - 40, 10);
+                } else {
+                    console.warn(`Imagen no disponible para: ${reference}`);
+                }
+
+                x += etiquetaAncho;
+                if (x >= 210) {
+                    x = 0;
+                    y += etiquetaAlto;
+                }
+                etiquetasGeneradas++;
+            }
+        });
+
+        doc.save("Etiquetas.pdf");
+    }
+}
+
+
+
+        window.onload = inicializarPagina;
+    </script>
+</body>
+</html>
